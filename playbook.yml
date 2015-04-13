@@ -1,0 +1,62 @@
+---
+- hosts: all
+  vars_files:
+    - vars.yml
+  sudo: yes
+  tasks:
+    - name: remove pip if installed from apt (fix bug of pip in ubuntu 14.XX)
+      apt: name=python-pip state=absent
+
+    - name: Easy install (fix bug of pip in ubuntu 14.XX)
+      easy_install: name=pip
+
+    - name: Make sure there's no pip folder from previous operation
+      file: path=/tmp/pip_build_root state=absent
+
+    - name: Install Docker-py
+      pip: name=docker-py state=present
+
+    - name: Make sure there's no pip folder from previous operation
+      file: path=/tmp/pip_build_root state=absent
+
+
+    - name: check or build image for postgres
+      docker_image: path="./DockerFiles/postgres" name="allansimon/postgres-for-symfony" state=build
+
+    - name: postgresql container
+      docker:
+        name: app_database
+        image: allansimon/postgres-for-symfony
+        state: restarted
+        volumes:
+            - /tmp/postgres:/var/lib/postgresql/data
+        env:
+            POSTGRES_PASSWORD: "{{ DB_PASSWORD }}"
+            APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
+            APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
+            APP_DB_NAME: "{{ APP_DB_NAME }}"
+
+    - name: check or build image for symfony2
+      docker_image: path="./DockerFiles/Symfony2" name="allansimon/symfony2" state=build
+
+    - name: nginx and php-fpm
+      docker:
+        name: app_webserver
+        image: allansimon/symfony2
+        state: restarted
+        volumes:
+        links:
+            - "app_database:app_database"
+        ports:
+            - "8088:80"
+        volumes:
+            - "{{ APP_DIR }}/application:/var/www"
+            - /tmp/nginx-logs:/var/logs/nginx
+        env:
+            GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
+            APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
+            APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
+            APP_DB_NAME: "{{ APP_DB_NAME }}"
+            APP_MAILER_HOST: "{{ APP_MAILER_HOST }}"
+            APP_MAILER_USER: "{{ APP_MAILER_USER }}"
+            APP_MAILER_PASSWORD: "{{ APP_MAILER_PASSWORD }}"

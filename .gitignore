@@ -1,0 +1,4 @@
+composer.phar
+application
+.vagrant
+vars.yml
