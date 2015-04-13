@@ -25,11 +25,11 @@
 
     - name: postgresql container
       docker:
-        name: app_database
+        name: "{{ PROJECT_NAME }}_app_database"
         image: allansimon/postgres-for-symfony
         state: restarted
         volumes:
-            - /tmp/postgres:/var/lib/postgresql/data
+            - "{{ APP_DIR }}/docker/db_data:/var/lib/postgresql/data"
         env:
             POSTGRES_PASSWORD: "{{ DB_PASSWORD }}"
             APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
@@ -41,17 +41,17 @@
 
     - name: nginx and php-fpm
       docker:
-        name: app_webserver
+        name: "{{ PROJECT_NAME }}_app_webserver"
         image: allansimon/symfony2
         state: restarted
         volumes:
         links:
-            - "app_database:app_database"
+            - "{{ PROJECT_NAME }}_app_database:app_database"
         ports:
             - "8088:80"
         volumes:
-            - "{{ APP_DIR }}/application:/var/www"
-            - /tmp/nginx-logs:/var/logs/nginx
+            - "{{ APP_DIR }}:/var/www"
+            - "{{ APP_DIR }}/docker/nginx-logs:/var/logs/nginx"
         env:
             GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
             APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
