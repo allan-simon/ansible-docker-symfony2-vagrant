@@ -16,4 +16,4 @@ APP_MAILER_PASSWORD: example
 
 APP_DIR: /path/to/your/symfony2/application
 
-
+OWNER: your_local_user

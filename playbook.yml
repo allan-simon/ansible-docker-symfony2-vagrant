@@ -20,6 +20,16 @@
       file: path=/tmp/pip_build_root state=absent
 
 
+    - name: create docker directory
+      file: path="{{APP_DIR }}/docker" state=directory owner="{{ OWNER }}"
+
+    - name: create docker directory for postgres data
+      file: path="{{APP_DIR }}/docker/db_data" state=directory owner="{{ OWNER }}"
+
+    - name: create docker directory for nginx logs
+      file: path="{{APP_DIR }}/docker/nginx-logs" state=directory owner="{{ OWNER }}"
+
+
     - name: check or build image for postgres
       docker_image: path="./DockerFiles/postgres" name="allansimon/postgres-for-symfony" state=build
 
