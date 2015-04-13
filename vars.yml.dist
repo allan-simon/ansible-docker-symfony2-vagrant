@@ -1,0 +1,18 @@
+#used by postgres itself 
+DB_PASSWORD: 'password'
+
+# for composer
+GITHUB_TOKEN: your_github_token
+
+#for symfony
+APP_DB_USER_NAME: symfony_db_user
+APP_DB_USER_PASSWORD: symfony_db_password
+APP_DB_NAME: symfony_db
+
+APP_MAILER_HOST: smtp.example.com
+APP_MAILER_USER: noreply@example.com
+APP_MAILER_PASSWORD: example
+
+APP_DIR: /path/to/your/symfony2/application
+
+
