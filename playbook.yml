@@ -49,19 +49,23 @@
     - name: check or build image for symfony2
       docker_image: path="./DockerFiles/Symfony2" name="allansimon/symfony2" state=build
 
-    - name: nginx and php-fpm
+    - name: check or build image for nginx
+      docker_image: path="./DockerFiles/nginx" name="allansimon/nginx" state=build
+
+    - name: check or build image for php-fpm
+      docker_image: path="./DockerFiles/php-fpm" name="allansimon/php-fpm" state=build
+
+    - name: symfony2
       docker:
-        name: "{{ PROJECT_NAME }}_app_webserver"
+        name: "{{ PROJECT_NAME }}_app_code"
         image: allansimon/symfony2
         state: restarted
         volumes:
         links:
             - "{{ PROJECT_NAME }}_app_database:app_database"
-        ports:
-            - "8088:80"
+
         volumes:
             - "{{ APP_DIR }}:/var/www"
-            - "{{ APP_DIR }}/docker/nginx-logs:/var/logs/nginx"
         env:
             GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
             APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
@@ -70,3 +74,32 @@
             APP_MAILER_HOST: "{{ APP_MAILER_HOST }}"
             APP_MAILER_USER: "{{ APP_MAILER_USER }}"
             APP_MAILER_PASSWORD: "{{ APP_MAILER_PASSWORD }}"
+
+    - name: php-fpm
+      docker:
+        name: "{{ PROJECT_NAME }}_app_php_fpm"
+        image: allansimon/php-fpm
+        state: started
+        links:
+            - "{{ PROJECT_NAME }}_app_database:app_database"
+        volumes:
+            - "{{ APP_DIR }}:/var/www"
+
+    - name: nginx container
+      docker:
+        name: "{{ PROJECT_NAME }}_app_nginx"
+        image: allansimon/nginx
+        state: started
+        links:
+            - "{{ PROJECT_NAME }}_app_php_fpm:fpm"
+        ports:
+            - "8088:80"
+        volumes:
+            - "{{ APP_DIR }}:/var/www"
+
+
+    #- name: Run doctrine migrations
+    #shell: docker exec -i "{{ PROJECT_NAME }}_app_webserver" composer install --working-dir /var/www
+
+    #- name: Run doctrine migrations
+    #  shell: docker exec -i "{{ PROJECT_NAME }}_app_webserver" php /var/www/app/console doctrine:migrations:migrate --no-interaction

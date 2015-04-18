@@ -1,10 +1,5 @@
 #!/bin/bash
 
-if [ $DEBUG ]; then
-    echo "xdebug.remote_connect_back=On" >> /etc/php5/fpm/conf.d/20-xdebug.ini
-    echo "xdebug.remote_enable=On" >> /etc/php5/fpm/conf.d/20-xdebug.ini
-fi
-
 cd /var/www
 
 if [ -z "$1" ];
@@ -13,11 +8,10 @@ if [ -z "$1" ];
     # if you're in china and that for some reason
     # the docker build has failed to download composer.phar...
     if ! which composer; then
-
         if [ -f composer.phar ]; then
             cp composer.phar /usr/local/bin/composer
             chmod +x /usr/local/bin/composer
-        else
+        else 
             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
         fi
     fi
@@ -42,8 +36,6 @@ EOS
     chmod -R 777 app/logs
     chmod -R 777 app/cache
 
-    service php5-fpm restart
-    nginx
 else
     exec "$@"
 fi
