@@ -1,9 +1,13 @@
 ---
 - hosts: all
+  vars:
+    current_color: blue
   vars_files:
     - vars.yml
   sudo: yes
   tasks:
+
+    # pip / docker.py installation
     - name: remove pip if installed from apt (fix bug of pip in ubuntu 14.XX)
       apt: name=python-pip state=absent
 
@@ -19,32 +23,56 @@
     - name: Make sure there's no pip folder from previous operation
       file: path=/tmp/pip_build_root state=absent
 
+    # directory creation
 
     - name: create docker directory
       file: path="{{APP_DIR }}/docker" state=directory owner="{{ OWNER }}"
 
-    - name: create docker directory for postgres data
-      file: path="{{APP_DIR }}/docker/db_data" state=directory owner="{{ OWNER }}"
+    - name: create docker directory for nginx data
+      file: path="{{APP_DIR }}/docker/nginx" state=directory owner="{{ OWNER }}"
 
-    - name: create docker directory for nginx logs
-      file: path="{{APP_DIR }}/docker/nginx-logs" state=directory owner="{{ OWNER }}"
+    # blue/green
 
+    - name: if color file does not exists, we create it set to green
+      copy:
+            content="green"
+            dest="{{ APP_DIR }}/docker/nginx/current_color"
+            force=no
 
+    - name: get current color
+      shell: cat {{ APP_DIR }}/docker/nginx/current_color
+      register: current_color_content
+
+    - debug: var=current_color_content.stdout
+
+    - name: set color to blue if previous was green
+      set_fact:
+            current_color: blue
+      when: current_color_content.stdout == 'green'
+
+    - name: set color to green if previous was blue
+      set_fact:
+            current_color: green
+      when: current_color_content.stdout == 'blue'
+    - name: save color in file
+      copy:
+            content="{{ current_color }}"
+            dest="{{ APP_DIR }}/docker/nginx/current_color"
+
+    - name: checkout repository
+      git:
+            force=yes
+            repo="{{ APP_GIT_REPOSITORY }}"
+            accept_hostkey=yes
+            dest="{{ APP_DIR }}/docker/{{ current_color }}"
+            version="{{ BRANCH }}"
+
+    - name: delete ready file
+      file: path="{{ APP_DIR }}/docker/{{ current_color }}/app/ready" state=absent
+
+    # docker image creation 
     - name: check or build image for postgres
       docker_image: path="./DockerFiles/postgres" name="allansimon/postgres-for-symfony" state=build
-
-    - name: postgresql container
-      docker:
-        name: "{{ PROJECT_NAME }}_app_database"
-        image: allansimon/postgres-for-symfony
-        state: restarted
-        volumes:
-            - "{{ APP_DIR }}/docker/db_data:/var/lib/postgresql/data"
-        env:
-            POSTGRES_PASSWORD: "{{ DB_PASSWORD }}"
-            APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
-            APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
-            APP_DB_NAME: "{{ APP_DB_NAME }}"
 
     - name: check or build image for symfony2
       docker_image: path="./DockerFiles/Symfony2" name="allansimon/symfony2" state=build
@@ -52,12 +80,29 @@
     - name: check or build image for nginx
       docker_image: path="./DockerFiles/nginx" name="allansimon/nginx" state=build
 
+    - name: check or build image for nginx load-balancer
+      docker_image: path="./DockerFiles/nginx-load-balancer" name="allansimon/nginx-load-balancer" state=build
+
     - name: check or build image for php-fpm
       docker_image: path="./DockerFiles/php-fpm" name="allansimon/php-fpm" state=build
 
-    - name: symfony2
+    # docker container instanciation
+
+    - name: postgresql container
       docker:
-        name: "{{ PROJECT_NAME }}_app_code"
+        name: "{{ PROJECT_NAME }}_app_database"
+        image: allansimon/postgres-for-symfony
+        state: started
+        env:
+            POSTGRES_PASSWORD: "{{ DB_PASSWORD }}"
+            APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
+            APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
+            APP_DB_NAME: "{{ APP_DB_NAME }}"
+
+    - name: symfony2 blue
+      when: current_color == 'blue'
+      docker:
+        name: "{{ PROJECT_NAME }}_app_code_blue"
         image: allansimon/symfony2
         state: restarted
         volumes:
@@ -65,8 +110,9 @@
             - "{{ PROJECT_NAME }}_app_database:app_database"
 
         volumes:
-            - "{{ APP_DIR }}:/var/www"
+            - "{{ APP_DIR }}/docker/blue:/var/www"
         env:
+            SERVER_COLOR: blue
             GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
             APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
             APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
@@ -75,31 +121,90 @@
             APP_MAILER_USER: "{{ APP_MAILER_USER }}"
             APP_MAILER_PASSWORD: "{{ APP_MAILER_PASSWORD }}"
 
-    - name: php-fpm
+    - name: php-fpm blue
       docker:
-        name: "{{ PROJECT_NAME }}_app_php_fpm"
+        name: "{{ PROJECT_NAME }}_app_php_fpm_blue"
         image: allansimon/php-fpm
         state: started
         links:
             - "{{ PROJECT_NAME }}_app_database:app_database"
         volumes:
-            - "{{ APP_DIR }}:/var/www"
+            - "{{ APP_DIR }}/docker/blue:/var/www"
 
-    - name: nginx container
+    - name: nginx container blue
       docker:
-        name: "{{ PROJECT_NAME }}_app_nginx"
+        name: "{{ PROJECT_NAME }}_app_nginx_blue"
         image: allansimon/nginx
         state: started
         links:
-            - "{{ PROJECT_NAME }}_app_php_fpm:fpm"
+            - "{{ PROJECT_NAME }}_app_php_fpm_blue:fpm"
+        volumes:
+            - "{{ APP_DIR }}/docker/blue:/var/www"
+
+    - name: symfony2 green
+      when: current_color == 'green'
+      docker:
+        name: "{{ PROJECT_NAME }}_app_code_green"
+        image: allansimon/symfony2
+        state: restarted
+        volumes:
+        links:
+            - "{{ PROJECT_NAME }}_app_database:app_database"
+
+        volumes:
+            - "{{ APP_DIR }}/docker/green:/var/www"
+        env:
+            SERVER_COLOR: green
+            GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
+            APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
+            APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
+            APP_DB_NAME: "{{ APP_DB_NAME }}"
+            APP_MAILER_HOST: "{{ APP_MAILER_HOST }}"
+            APP_MAILER_USER: "{{ APP_MAILER_USER }}"
+            APP_MAILER_PASSWORD: "{{ APP_MAILER_PASSWORD }}"
+
+    - name: php-fpm green
+      docker:
+        name: "{{ PROJECT_NAME }}_app_php_fpm_green"
+        image: allansimon/php-fpm
+        state: started
+        links:
+            - "{{ PROJECT_NAME }}_app_database:app_database"
+        volumes:
+            - "{{ APP_DIR }}/docker/green:/var/www"
+
+    - name: nginx container green
+      docker:
+        name: "{{ PROJECT_NAME }}_app_nginx_green"
+        image: allansimon/nginx
+        state: started
+        links:
+            - "{{ PROJECT_NAME }}_app_php_fpm_green:fpm"
+        volumes:
+            - "{{ APP_DIR }}/docker/green:/var/www"
+
+    - name: nginx load balancer
+      docker:
+        name: "{{ PROJECT_NAME }}_app_nginx_load_balancer"
+        image: allansimon/nginx-load-balancer
+        state: started
         ports:
             - "8088:80"
-        volumes:
-            - "{{ APP_DIR }}:/var/www"
+        links:
+            - "{{ PROJECT_NAME }}_app_nginx_green:green"
+            - "{{ PROJECT_NAME }}_app_nginx_blue:blue"
+        env:
+            SERVER_COLOR: "{{ current_color }}"
 
 
-    #- name: Run doctrine migrations
-    #shell: docker exec -i "{{ PROJECT_NAME }}_app_webserver" composer install --working-dir /var/www
+    - debug: msg="wait for {{ current_color }}"
 
-    #- name: Run doctrine migrations
-    #  shell: docker exec -i "{{ PROJECT_NAME }}_app_webserver" php /var/www/app/console doctrine:migrations:migrate --no-interaction
+    - name: wait for cache to be ready
+      wait_for: path="{{ APP_DIR }}/docker/{{ current_color }}/app/ready"
+
+    - debug: msg="switch nginx to {{ current_color }}"
+
+    - shell: docker exec  "{{ PROJECT_NAME }}_app_nginx_load_balancer" bash -c "echo 'set \$activeBackend {{ current_color }};' > /etc/nginx/backend.conf "
+    - shell: docker exec  "{{ PROJECT_NAME }}_app_nginx_load_balancer" nginx -s reload
+
+

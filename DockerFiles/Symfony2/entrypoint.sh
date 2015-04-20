@@ -35,6 +35,8 @@ EOS
     # not pretty ...
     chmod -R 777 app/logs
     chmod -R 777 app/cache
+    touch app/ready
+    chmod 666 app/ready
 
 else
     exec "$@"

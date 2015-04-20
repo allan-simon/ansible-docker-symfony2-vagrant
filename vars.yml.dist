@@ -16,4 +16,7 @@ APP_MAILER_PASSWORD: example
 
 APP_DIR: /path/to/your/symfony2/application
 
+APP_GIT_REPOSITORY: path_to_git_repository
+BRANCH: branch_to_checkout
+
 OWNER: your_local_user
