@@ -68,7 +68,7 @@
             version="{{ BRANCH }}"
 
     - name: delete ready file
-      file: path="{{ APP_DIR }}/docker/{{ current_color }}/app/ready" state=absent
+      file: path="{{ APP_DIR }}/docker/{{ current_color }}/{{ APP_ROOT }}/app/ready" state=absent
 
     # docker image creation 
     - name: check or build image for postgres
@@ -110,7 +110,7 @@
             - "{{ PROJECT_NAME }}_app_database:app_database"
 
         volumes:
-            - "{{ APP_DIR }}/docker/blue:/var/www"
+            - "{{ APP_DIR }}/docker/blue/{{ APP_ROOT }}:/var/www"
         env:
             SERVER_COLOR: blue
             GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
@@ -129,7 +129,7 @@
         links:
             - "{{ PROJECT_NAME }}_app_database:app_database"
         volumes:
-            - "{{ APP_DIR }}/docker/blue:/var/www"
+            - "{{ APP_DIR }}/docker/blue/{{ APP_ROOT}}:/var/www"
 
     - name: nginx container blue
       docker:
@@ -139,7 +139,7 @@
         links:
             - "{{ PROJECT_NAME }}_app_php_fpm_blue:fpm"
         volumes:
-            - "{{ APP_DIR }}/docker/blue:/var/www"
+            - "{{ APP_DIR }}/docker/blue/{{ APP_ROOT }}:/var/www"
 
     - name: symfony2 green
       when: current_color == 'green'
@@ -152,7 +152,7 @@
             - "{{ PROJECT_NAME }}_app_database:app_database"
 
         volumes:
-            - "{{ APP_DIR }}/docker/green:/var/www"
+            - "{{ APP_DIR }}/docker/green/{{ APP_ROOT }}:/var/www"
         env:
             SERVER_COLOR: green
             GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
@@ -171,7 +171,7 @@
         links:
             - "{{ PROJECT_NAME }}_app_database:app_database"
         volumes:
-            - "{{ APP_DIR }}/docker/green:/var/www"
+            - "{{ APP_DIR }}/docker/green/{{ APP_ROOT }}:/var/www"
 
     - name: nginx container green
       docker:
@@ -181,7 +181,7 @@
         links:
             - "{{ PROJECT_NAME }}_app_php_fpm_green:fpm"
         volumes:
-            - "{{ APP_DIR }}/docker/green:/var/www"
+            - "{{ APP_DIR }}/docker/green/{{ APP_ROOT }}:/var/www"
 
     - name: nginx load balancer
       docker:
@@ -189,7 +189,7 @@
         image: allansimon/nginx-load-balancer
         state: started
         ports:
-            - "8088:80"
+            - "{{ PUBLIC_PORT }}:80"
         links:
             - "{{ PROJECT_NAME }}_app_nginx_green:green"
             - "{{ PROJECT_NAME }}_app_nginx_blue:blue"
@@ -200,7 +200,7 @@
     - debug: msg="wait for {{ current_color }}"
 
     - name: wait for cache to be ready
-      wait_for: path="{{ APP_DIR }}/docker/{{ current_color }}/app/ready"
+      wait_for: path="{{ APP_DIR }}/docker/{{ current_color }}/{{ APP_ROOT }}/app/ready" timeout=600
 
     - debug: msg="switch nginx to {{ current_color }}"
 

@@ -1,4 +1,10 @@
 PROJECT_NAME: name_of_the_project_you_are_deploying
+
+PUBLIC_PORT: port_to_use_on_public_ip
+# relative path in your project repository in which your app is put
+# simply put '' if your app is at the root of your repository
+APP_ROOT: directory_in_which_the_app_folder_is
+
 #used by postgres itself 
 DB_PASSWORD: 'password'
 
