@@ -1,27 +1,21 @@
 ---
 - hosts: all
+  remote_user: "{{ OWNER }}"
   vars:
     current_color: blue
-  vars_files:
-    - vars.yml
-  sudo: yes
   tasks:
 
     # pip / docker.py installation
-    - name: remove pip if installed from apt (fix bug of pip in ubuntu 14.XX)
-      apt: name=python-pip state=absent
+    - name: instal pip
+      apt: name=python-pip state=present
+      sudo: true
 
-    - name: Easy install (fix bug of pip in ubuntu 14.XX)
-      easy_install: name=pip
 
-    - name: Make sure there's no pip folder from previous operation
-      file: path=/tmp/pip_build_root state=absent
 
     - name: Install Docker-py
-      pip: name=docker-py state=present
+      pip: name=docker-py state=present version=1.1.0
+      sudo: true
 
-    - name: Make sure there's no pip folder from previous operation
-      file: path=/tmp/pip_build_root state=absent
 
     # directory creation
 
@@ -70,21 +64,24 @@
     - name: delete ready file
       file: path="{{ APP_DIR }}/docker/{{ current_color }}/{{ APP_ROOT }}/app/ready" state=absent
 
-    # docker image creation 
-    - name: check or build image for postgres
-      docker_image: path="./DockerFiles/postgres" name="allansimon/postgres-for-symfony" state=build
 
-    - name: check or build image for symfony2
-      docker_image: path="./DockerFiles/Symfony2" name="allansimon/symfony2" state=build
+    # docker image creation 
+    - name: Add User to docker group
+      action: user name="{{ OWNER }}" groups="docker" append=yes
+      sudo: yes
+
+    - name: copy docker files to host machine
+      copy: src=./DockerFiles dest="{{ APP_DIR }}/docker"
+
+    - name: check or build image for postgres
+      docker_image: path="{{ APP_DIR }}/docker/DockerFiles/postgres" name="allansimon/postgres-for-symfony" state=build
+      sudo: yes
 
     - name: check or build image for nginx
-      docker_image: path="./DockerFiles/nginx" name="allansimon/nginx" state=build
+      docker_image: path="{{ APP_DIR }}/docker/DockerFiles/nginx" name="allansimon/nginx" state=build
 
     - name: check or build image for nginx load-balancer
-      docker_image: path="./DockerFiles/nginx-load-balancer" name="allansimon/nginx-load-balancer" state=build
-
-    - name: check or build image for php-fpm
-      docker_image: path="./DockerFiles/php-fpm" name="allansimon/php-fpm" state=build
+      docker_image: path="{{ APP_DIR }}/docker/DockerFiles/nginx-load-balancer" name="allansimon/nginx-load-balancer" state=build
 
     # docker container instanciation
 
@@ -93,11 +90,7 @@
         name: "{{ PROJECT_NAME }}_app_database"
         image: allansimon/postgres-for-symfony
         state: started
-        env:
-            POSTGRES_PASSWORD: "{{ DB_PASSWORD }}"
-            APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
-            APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
-            APP_DB_NAME: "{{ APP_DB_NAME }}"
+        env: "{{ POSTGRES_ENV }}"
 
     - name: symfony2 blue
       when: current_color == 'blue'
@@ -111,15 +104,7 @@
 
         volumes:
             - "{{ APP_DIR }}/docker/blue/{{ APP_ROOT }}:/var/www"
-        env:
-            SERVER_COLOR: blue
-            GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
-            APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
-            APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
-            APP_DB_NAME: "{{ APP_DB_NAME }}"
-            APP_MAILER_HOST: "{{ APP_MAILER_HOST }}"
-            APP_MAILER_USER: "{{ APP_MAILER_USER }}"
-            APP_MAILER_PASSWORD: "{{ APP_MAILER_PASSWORD }}"
+        env: "{{ PHP_BLUE_ENV }}"
 
     - name: php-fpm blue
       docker:
@@ -153,15 +138,7 @@
 
         volumes:
             - "{{ APP_DIR }}/docker/green/{{ APP_ROOT }}:/var/www"
-        env:
-            SERVER_COLOR: green
-            GITHUB_TOKEN : "{{ GITHUB_TOKEN  }}"
-            APP_DB_USER_NAME: "{{ APP_DB_USER_NAME }}"
-            APP_DB_USER_PASSWORD: "{{ APP_DB_USER_PASSWORD }}"
-            APP_DB_NAME: "{{ APP_DB_NAME }}"
-            APP_MAILER_HOST: "{{ APP_MAILER_HOST }}"
-            APP_MAILER_USER: "{{ APP_MAILER_USER }}"
-            APP_MAILER_PASSWORD: "{{ APP_MAILER_PASSWORD }}"
+        env: "{{ PHP_GREEN_ENV }}"
 
     - name: php-fpm green
       docker:

@@ -17,3 +17,15 @@ How this set of scripts has been built is explained step by step in [this tutori
 ### For others:
 
 Vagrant and you're good
+
+### Usage
+
+Create a file `project_host` and a file `project_vars.yml` (this one based on vars.yml.dist)
+and then execute:
+
+```
+ ansible-playbook playbook.yml  -i project_host  -e@project_vars.yml --ask-become-pass
+```
+
+the goal is this way you can deploy as many independant projects as you want, you just need
+to change the host and vars file
