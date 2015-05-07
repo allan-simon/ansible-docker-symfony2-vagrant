@@ -85,9 +85,16 @@
 
     # docker container instanciation
 
+    - name: we make sure the php-fpm that is used is first stopped (to refresh cache)
+      docker:
+        name: "{{ PROJECT_NAME }}_fpm_{{ current_color }}"
+        image: allansimon/php-fpm
+        state: stopped
+
+
     - name: postgresql container
       docker:
-        name: "{{ PROJECT_NAME }}_app_database"
+        name: "{{ PROJECT_NAME }}_db"
         image: allansimon/postgres-for-symfony
         state: started
         env: "{{ POSTGRES_ENV }}"
@@ -95,12 +102,13 @@
     - name: symfony2 blue
       when: current_color == 'blue'
       docker:
-        name: "{{ PROJECT_NAME }}_app_code_blue"
+        name: "{{ PROJECT_NAME }}_code_blue"
         image: allansimon/symfony2
         state: restarted
+        pull: always
         volumes:
         links:
-            - "{{ PROJECT_NAME }}_app_database:app_database"
+            - "{{ PROJECT_NAME }}_db:app_database"
 
         volumes:
             - "{{ APP_DIR }}/docker/blue/{{ APP_ROOT }}:/var/www"
@@ -108,33 +116,35 @@
 
     - name: php-fpm blue
       docker:
-        name: "{{ PROJECT_NAME }}_app_php_fpm_blue"
+        name: "{{ PROJECT_NAME }}_fpm_blue"
+        pull: always
         image: allansimon/php-fpm
         state: started
         links:
-            - "{{ PROJECT_NAME }}_app_database:app_database"
+            - "{{ PROJECT_NAME }}_db:app_database"
         volumes:
             - "{{ APP_DIR }}/docker/blue/{{ APP_ROOT}}:/var/www"
 
     - name: nginx container blue
       docker:
-        name: "{{ PROJECT_NAME }}_app_nginx_blue"
+        name: "{{ PROJECT_NAME }}_nginx_blue"
         image: allansimon/nginx
         state: started
         links:
-            - "{{ PROJECT_NAME }}_app_php_fpm_blue:fpm"
+            - "{{ PROJECT_NAME }}_fpm_blue:fpm"
         volumes:
             - "{{ APP_DIR }}/docker/blue/{{ APP_ROOT }}:/var/www"
 
     - name: symfony2 green
       when: current_color == 'green'
       docker:
-        name: "{{ PROJECT_NAME }}_app_code_green"
+        name: "{{ PROJECT_NAME }}_code_green"
+        pull: always
         image: allansimon/symfony2
         state: restarted
         volumes:
         links:
-            - "{{ PROJECT_NAME }}_app_database:app_database"
+            - "{{ PROJECT_NAME }}_db:app_database"
 
         volumes:
             - "{{ APP_DIR }}/docker/green/{{ APP_ROOT }}:/var/www"
@@ -142,34 +152,35 @@
 
     - name: php-fpm green
       docker:
-        name: "{{ PROJECT_NAME }}_app_php_fpm_green"
+        name: "{{ PROJECT_NAME }}_fpm_green"
         image: allansimon/php-fpm
+        pull: always
         state: started
         links:
-            - "{{ PROJECT_NAME }}_app_database:app_database"
+            - "{{ PROJECT_NAME }}_db:app_database"
         volumes:
             - "{{ APP_DIR }}/docker/green/{{ APP_ROOT }}:/var/www"
 
     - name: nginx container green
       docker:
-        name: "{{ PROJECT_NAME }}_app_nginx_green"
+        name: "{{ PROJECT_NAME }}_nginx_green"
         image: allansimon/nginx
         state: started
         links:
-            - "{{ PROJECT_NAME }}_app_php_fpm_green:fpm"
+            - "{{ PROJECT_NAME }}_fpm_green:fpm"
         volumes:
             - "{{ APP_DIR }}/docker/green/{{ APP_ROOT }}:/var/www"
 
     - name: nginx load balancer
       docker:
-        name: "{{ PROJECT_NAME }}_app_nginx_load_balancer"
+        name: "{{ PROJECT_NAME }}_nginx_load_balancer"
         image: allansimon/nginx-load-balancer
         state: started
         ports:
             - "{{ PUBLIC_PORT }}:80"
         links:
-            - "{{ PROJECT_NAME }}_app_nginx_green:green"
-            - "{{ PROJECT_NAME }}_app_nginx_blue:blue"
+            - "{{ PROJECT_NAME }}_nginx_green:green"
+            - "{{ PROJECT_NAME }}_nginx_blue:blue"
         env:
             SERVER_COLOR: "{{ current_color }}"
 
@@ -181,7 +192,7 @@
 
     - debug: msg="switch nginx to {{ current_color }}"
 
-    - shell: docker exec  "{{ PROJECT_NAME }}_app_nginx_load_balancer" bash -c "echo 'set \$activeBackend {{ current_color }};' > /etc/nginx/backend.conf "
-    - shell: docker exec  "{{ PROJECT_NAME }}_app_nginx_load_balancer" nginx -s reload
+    - shell: docker exec  "{{ PROJECT_NAME }}_nginx_load_balancer" bash -c "echo 'set \$activeBackend {{ current_color }};' > /etc/nginx/backend.conf "
+    - shell: docker exec  "{{ PROJECT_NAME }}_nginx_load_balancer" nginx -s reload
 
 
