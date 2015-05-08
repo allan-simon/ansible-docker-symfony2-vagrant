@@ -85,13 +85,6 @@
 
     # docker container instanciation
 
-    - name: we make sure the php-fpm that is used is first stopped (to refresh cache)
-      docker:
-        name: "{{ PROJECT_NAME }}_fpm_{{ current_color }}"
-        image: allansimon/php-fpm
-        state: stopped
-
-
     - name: postgresql container
       docker:
         name: "{{ PROJECT_NAME }}_db"
@@ -192,6 +185,7 @@
 
     - debug: msg="switch nginx to {{ current_color }}"
 
+    - shell: docker kill --signal=USR2 "{{ PROJECT_NAME }}_fpm_{{ current_color }}"
     - shell: docker exec  "{{ PROJECT_NAME }}_nginx_load_balancer" bash -c "echo 'set \$activeBackend {{ current_color }};' > /etc/nginx/backend.conf "
     - shell: docker exec  "{{ PROJECT_NAME }}_nginx_load_balancer" nginx -s reload
 
